@@ -29,18 +29,14 @@ int createALContext() {
 	alListener3f(AL_VELOCITY, 0, 0, 0);
 //	alListenerfv(AL_ORIENTATION, orientation);
 
-
 	alGenSources(1, &source);
 
 	ALenum err = alGetError();
-
 	if (err != AL_NO_ERROR) {
-
 		printf("Creating OpenAL context failed.\n");
 		return 0;
-			
-
 	}
+
 	const float position[3] = { 0.0, 0.0, 0.0 };
 //	const float velocity[3] = { 0.0, 0.0, 0.0 };
 //	const float orientation[6] = { 0.0, 0.0, -1.0, 0.0, 1.0, 0.0 };
@@ -84,8 +80,8 @@ static int createBufferFromData_int16(void *data, size_t samplecount, ALuint for
 }
 
 int load_raw(char* buf_beg, size_t filesize) {
-	// assuming mono 44100, it's a builtin file (alarmsound.o)
-	const size_t sample_count = (filesize - 44)/sizeof(short); // the size of a WAV file header is 44
+	// assuming mono 44100, we're using a builtin file (alarmsound.o)
+	const size_t sample_count = (filesize - 44)/sizeof(short); // WAV header = 44 bytes
 	return createBufferFromData_int16(buf_beg+44, sample_count, AL_FORMAT_MONO16);
 }
 

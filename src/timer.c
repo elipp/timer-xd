@@ -49,8 +49,6 @@ typedef struct {
 
 char* substring(const char* string, size_t pos, size_t length) {
 
-	// consider: "if (length == 0) { return NULL; }"
-
 	char* ret = malloc(length+1);
 	memcpy(ret, &string[pos], length);
 	ret[length] = '\0';
@@ -75,7 +73,7 @@ static void unit_initialize(arg_unit *unit, char* arg) {
 
 struct time_string_constant_pair {
 	const char* time_string;
-	double factor;
+	int factor;
 };
 
 static const struct time_string_constant_pair time_table[] = {
@@ -91,7 +89,7 @@ static const struct time_string_constant_pair time_table[] = {
 
 static const size_t time_table_sz = sizeof(time_table)/sizeof(time_table[0]);
 
-static double get_time_factor(const char *term) {
+static int get_time_factor(const char *term) {
 	int i = 0;
 	while (i < time_table_sz) {
 		if (strcmp(term, time_table[i].time_string) == 0) {
@@ -104,7 +102,7 @@ static double get_time_factor(const char *term) {
 	return -1;
 }
 
-static double get_time_from_mixed(const char* arg) {
+static int get_time_from_mixed(const char* arg, double *ret) {
 	// the term should begin with only digits
 	
 	const size_t arg_len = strlen(arg);
@@ -132,25 +130,16 @@ static double get_time_from_mixed(const char* arg) {
 	double factor = get_time_factor(str_part);
 	free(str_part);
 
-	return factor == -1 ? -1 : factor*q;	
+	*ret = factor == -1 ? -1 : factor*q;	
+
+	return 1;
 
 }
 
 static long parse_cmdline_get_seconds(int argc, char *argv[]) {
-	// argv[0] always contains the name of the executable, by convention
 	
-	/*
-	 * Valid formats:
-	 * 1h 30min 55s
-	 * 1 h 30 min 55 s
-	 * 1h 30m 55sec
-	 * 1 h 30min 55    s
-	 * 30 (resolves to seconds)
-	 */
-
 	const size_t num_units = argc-1;
 	arg_unit units[num_units];
-
 
 	size_t i = 1;
 	while (i < argc) {
@@ -173,7 +162,6 @@ static long parse_cmdline_get_seconds(int argc, char *argv[]) {
 	double t_sum_seconds = 0;
 	while (i < num_units) {
 		if (units[i].arg_info == CONTAINS_LETTERS) {
-			// only letters -> the previous unit must have only digits to be valid
 			if (i > 0) {
 				if (units[i-1].arg_info != CONTAINS_NUMBERS) {
 					printf("error: invalid unit \"%s\".\n", units[i].str);
@@ -198,8 +186,9 @@ static long parse_cmdline_get_seconds(int argc, char *argv[]) {
 			}
 		}
 		else if (units[i].arg_info == CONTAINS_BOTH) {
-			double t = get_time_from_mixed(units[i].str);
-			if (t == -1.0) {
+			double t = 0;
+		       	int ret = get_time_from_mixed(units[i].str, &t);
+			if (ret < 0) {
 				return -1;
 			}
 			t_sum_seconds += t;
@@ -220,17 +209,14 @@ static void countdown(long seconds) {
 	const long sleeptime = 1000000000L - measured_overhead_adjustment;
 	const struct timespec t = { 0, sleeptime };
 
-	while (i>0) {
+	while (i > 0) {
 		
-		/* one could, of course, measure the actual number of cycles spent on the loop (i.e. the divl + fprintf + nanosleep),
-		 * by means of (e.g.) the x86_64 instruction rdtsc or clock_gettime(CLOCK_PROCESS_CPUTIME_ID, ...) */
-
 		unsigned long minutes = i/60;
 		unsigned long seconds = i%60;
 
 		// use stderr for unbuffered output :P 
 		fprintf(stderr, "%s%lu min, %lu sec left", escapes_joined, minutes, seconds);
-		nanosleep(&t, NULL);	// ~3% cpu usage 
+		nanosleep(&t, NULL);
 		--i;
 	}
 
@@ -245,7 +231,6 @@ int main(int argc, char *argv[]) {
 
 	if (argc < 2) { usage(); return 1; }
 
-
 	const long t = parse_cmdline_get_seconds(argc, argv);
 	if (t == -1) { printf("error: invalid TIMESTRING - invoke this program without arguments for further information.\n"); return 1; }
 	
@@ -253,26 +238,15 @@ int main(int argc, char *argv[]) {
 	createALContext();
 	load_raw(&_binary_alarm_wav_start, alarm_wav_size);
 
-#ifdef MEASURE_LOOP_OVERHEAD 
-	struct timespec b, e;
-	while (clock_gettime(CLOCK_MONOTONIC_RAW, &b));	// this ensures clock_gettime was successful
-#endif
 	countdown(t);
 
-#ifdef MEASURE_LOOP_OVERHEAD
-	while (clock_gettime(CLOCK_MONOTONIC_RAW, &e));
-	const double microseconds = (double)(e.tv_nsec-b.tv_nsec)/(double)1000.0 + (double)(e.tv_sec-b.tv_sec)*(double)1000000.0;
-	const double d = microseconds - (double)t*1000000.0; 
-	printf("\nThe loop itself had a total overhead of %f us, or about %f us/iteration\n", d, d/(double)t);
-#endif
-	system("amixer sset Master 90% > /dev/null 2>&1");
+	system("amixer sset Master 90% > /dev/null 2>&1");	// this is crap, but works alright for me :P
 	playSound();
 
-	while (is_still_playing()) { /* do nothing ;) */ }
+	while (is_still_playing());
 	
 	al_cleanup();
-	system("amixer sset Master 30% > /dev/null 2>&1");	// just assume 30%, since there are no _easy_ ways to import the actual
-								// alsactl/amixer information to a C program
+	system("amixer sset Master 30% > /dev/null 2>&1");	
 
 	putchar('\n');
 	return 0;
