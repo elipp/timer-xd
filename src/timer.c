@@ -224,8 +224,8 @@ static void countdown(long seconds) {
 
 }
 
-extern char _binary_alarm_wav_start;
-extern char _binary_alarm_wav_end;
+extern char _binary_resources_alarm_wav_start;
+extern char _binary_resources_alarm_wav_end;
 
 int main(int argc, char *argv[]) {
 
@@ -234,9 +234,9 @@ int main(int argc, char *argv[]) {
 	const long t = parse_cmdline_get_seconds(argc, argv);
 	if (t == -1) { printf("error: invalid TIMESTRING - invoke this program without arguments for further information.\n"); return 1; }
 	
-	const size_t alarm_wav_size = &_binary_alarm_wav_end - &_binary_alarm_wav_start;
+	const size_t alarm_wav_size = &_binary_resources_alarm_wav_end - &_binary_resources_alarm_wav_start;
 	createALContext();
-	load_raw(&_binary_alarm_wav_start, alarm_wav_size);
+	load_raw(&_binary_resources_alarm_wav_start, alarm_wav_size);
 
 	countdown(t);
 
